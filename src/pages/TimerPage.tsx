@@ -52,7 +52,7 @@ export default function TimerPage() {
 
   const handlePause = () => setIsPaused(p => !p);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const totalMinutes = Math.floor(seconds / 60);
     const pauseMinutes = Math.floor(pauseSeconds / 60);
     const duration = totalMinutes - pauseMinutes;
@@ -61,7 +61,7 @@ export default function TimerPage() {
     const now = new Date();
     const endTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    addSession({
+    await addSession({
       date: new Date().toISOString().split('T')[0],
       startTime,
       endTime,
