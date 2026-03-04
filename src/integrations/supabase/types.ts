@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      disciplines: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          created_at: string
+          daily_minutes: number
+          id: string
+          monthly_minutes: number
+          total_days: number
+          total_hours: number
+          updated_at: string
+          user_id: string
+          weekly_minutes: number
+        }
+        Insert: {
+          created_at?: string
+          daily_minutes?: number
+          id?: string
+          monthly_minutes?: number
+          total_days?: number
+          total_hours?: number
+          updated_at?: string
+          user_id: string
+          weekly_minutes?: number
+        }
+        Update: {
+          created_at?: string
+          daily_minutes?: number
+          id?: string
+          monthly_minutes?: number
+          total_days?: number
+          total_hours?: number
+          updated_at?: string
+          user_id?: string
+          weekly_minutes?: number
+        }
+        Relationships: []
+      }
+      medals: {
+        Row: {
+          created_at: string
+          current_value: number
+          id: string
+          medal_id: string
+          unlocked: boolean
+          unlocked_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_value?: number
+          id?: string
+          medal_id: string
+          unlocked?: boolean
+          unlocked_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          id?: string
+          medal_id?: string
+          unlocked?: boolean
+          unlocked_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          activity: string
+          created_at: string
+          date: string
+          discipline: string
+          duration_minutes: number
+          end_time: string
+          id: string
+          note: string
+          pause_minutes: number
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          activity?: string
+          created_at?: string
+          date: string
+          discipline: string
+          duration_minutes: number
+          end_time: string
+          id?: string
+          note?: string
+          pause_minutes?: number
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          activity?: string
+          created_at?: string
+          date?: string
+          discipline?: string
+          duration_minutes?: number
+          end_time?: string
+          id?: string
+          note?: string
+          pause_minutes?: number
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

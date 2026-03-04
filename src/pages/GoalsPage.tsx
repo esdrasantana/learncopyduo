@@ -22,7 +22,7 @@ export default function GoalsPage() {
   const projectedDays = goals.dailyMinutes > 0 ? Math.ceil(remainingMinutes / goals.dailyMinutes) : 0;
 
   const handleSave = (field: keyof typeof goals, value: number) => {
-    setGoals(g => ({ ...g, [field]: value }));
+    setGoals({ ...goals, [field]: value });
     toast.success('Meta atualizada!');
   };
 

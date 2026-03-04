@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Clock, Calendar, Trophy, Target, BarChart3, Timer } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, Trophy, Target, BarChart3, Timer, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -15,6 +16,7 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -41,6 +43,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
+        <div className="mt-auto pt-4 border-t border-border/30">
+          <p className="text-xs text-muted-foreground truncate px-3 mb-2">{user?.email}</p>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            Sair
+          </button>
+        </div>
       </aside>
 
       {/* Mobile bottom nav */}

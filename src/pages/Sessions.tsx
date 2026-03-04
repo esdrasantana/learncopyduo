@@ -35,13 +35,13 @@ export default function Sessions() {
     return Math.max(0, totalMin);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const duration = calculateDuration();
     if (duration <= 0) { toast.error('Duração inválida'); return; }
     if (!form.discipline) { toast.error('Selecione uma disciplina'); return; }
 
-    addSession({
+    await addSession({
       date: form.date,
       startTime: form.startTime,
       endTime: form.endTime,
