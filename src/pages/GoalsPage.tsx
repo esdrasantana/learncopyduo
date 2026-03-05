@@ -1,11 +1,13 @@
+import { useState } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import MetricCard from '@/components/MetricCard';
-import { Target, Clock, Calendar, TrendingUp } from 'lucide-react';
+import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -14,17 +16,53 @@ function formatMinutes(mins: number): string {
 }
 
 export default function GoalsPage() {
-  const { goals, setGoals, totalMinutes, studyDays } = useStudyData();
+  const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline } = useStudyData();
+
+  const [newDiscName, setNewDiscName] = useState('');
+  const [newDiscColor, setNewDiscColor] = useState('#3b82f6');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('');
+  const [showAddDisc, setShowAddDisc] = useState(false);
 
   const remainingMinutes = Math.max(0, goals.totalHours * 60 - totalMinutes);
   const remainingDays = Math.max(0, goals.totalDays - studyDays);
   const requiredPace = remainingDays > 0 ? Math.round(remainingMinutes / remainingDays) : 0;
   const projectedDays = goals.dailyMinutes > 0 ? Math.ceil(remainingMinutes / goals.dailyMinutes) : 0;
 
-  const handleSave = (field: keyof typeof goals, value: number) => {
+  const handleSaveGoal = (field: keyof typeof goals, valueInHours: number, isHourField: boolean) => {
+    const value = isHourField ? Math.round(valueInHours * 60) : valueInHours;
     setGoals({ ...goals, [field]: value });
     toast.success('Meta atualizada!');
   };
+
+  const handleAddDiscipline = () => {
+    if (!newDiscName.trim()) { toast.error('Nome obrigatório'); return; }
+    addDiscipline(newDiscName.trim(), newDiscColor);
+    setNewDiscName('');
+    setNewDiscColor('#3b82f6');
+    setShowAddDisc(false);
+  };
+
+  const handleStartEdit = (id: string, name: string, color: string) => {
+    setEditingId(id);
+    setEditName(name);
+    setEditColor(color);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingId || !editName.trim()) return;
+    updateDiscipline(editingId, editName.trim(), editColor);
+    setEditingId(null);
+  };
+
+  const goalFields = [
+    { label: 'Meta Diária (horas)', field: 'dailyMinutes' as const, displayValue: goals.dailyMinutes / 60, isHour: true },
+    { label: 'Meta Semanal (horas)', field: 'weeklyMinutes' as const, displayValue: goals.weeklyMinutes / 60, isHour: true },
+    { label: 'Meta Mensal (horas)', field: 'monthlyMinutes' as const, displayValue: goals.monthlyMinutes / 60, isHour: true },
+    { label: 'Total de Dias', field: 'totalDays' as const, displayValue: goals.totalDays, isHour: false },
+    { label: 'Total de Horas', field: 'totalHours' as const, displayValue: goals.totalHours, isHour: false },
+  ];
 
   return (
     <div className="space-y-6">
@@ -40,31 +78,85 @@ export default function GoalsPage() {
         <MetricCard title="Dias Restantes" value={remainingDays} icon={Target} variant={remainingDays < 30 ? 'danger' : 'default'} />
       </div>
 
+      {/* Goals config */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="metric-card space-y-5">
         <h3 className="text-sm font-semibold">Configurar Metas</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { label: 'Meta Diária (min)', field: 'dailyMinutes' as const, value: goals.dailyMinutes },
-            { label: 'Meta Semanal (min)', field: 'weeklyMinutes' as const, value: goals.weeklyMinutes },
-            { label: 'Meta Mensal (min)', field: 'monthlyMinutes' as const, value: goals.monthlyMinutes },
-            { label: 'Total de Dias', field: 'totalDays' as const, value: goals.totalDays },
-            { label: 'Total de Horas', field: 'totalHours' as const, value: goals.totalHours },
-          ].map(item => (
+          {goalFields.map(item => (
             <div key={item.field} className="space-y-1.5">
               <Label className="text-xs">{item.label}</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  defaultValue={item.value}
-                  className="bg-secondary border-border/50"
-                  onBlur={e => handleSave(item.field, Number(e.target.value))}
-                />
-              </div>
+              <Input
+                type="number"
+                min={0}
+                step={item.isHour ? 0.5 : 1}
+                defaultValue={item.displayValue}
+                className="bg-secondary border-border/50"
+                onBlur={e => handleSaveGoal(item.field, Number(e.target.value), item.isHour)}
+              />
             </div>
           ))}
         </div>
       </motion.div>
+
+      {/* Discipline management */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="metric-card space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Disciplinas</h3>
+          <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => setShowAddDisc(true)}>
+            <Plus className="w-3 h-3" /> Nova
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {disciplines.map(d => (
+            <div key={d.id} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-secondary/30">
+              {editingId === d.id ? (
+                <>
+                  <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border-0" />
+                  <Input value={editName} onChange={e => setEditName(e.target.value)} className="flex-1 h-8 bg-secondary border-border/50 text-sm" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={handleSaveEdit}><Check className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /></Button>
+                </>
+              ) : (
+                <>
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                  <span className="flex-1 text-sm">{d.name}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleStartEdit(d.id, d.name, d.color)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteDiscipline(d.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Add discipline dialog */}
+      <Dialog open={showAddDisc} onOpenChange={setShowAddDisc}>
+        <DialogContent className="sm:max-w-sm bg-card border-border/50">
+          <DialogHeader><DialogTitle>Nova Disciplina</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome</Label>
+              <Input value={newDiscName} onChange={e => setNewDiscName(e.target.value)} placeholder="Ex: Direito Constitucional" className="bg-secondary border-border/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cor</Label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={newDiscColor} onChange={e => setNewDiscColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0" />
+                <span className="text-xs text-muted-foreground font-mono">{newDiscColor}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDisc(false)}>Cancelar</Button>
+            <Button onClick={handleAddDiscipline}>Criar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

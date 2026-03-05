@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
+import SessionSummaryDialog from '@/components/SessionSummaryDialog';
+import { Session } from '@/types/study';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -16,45 +18,46 @@ function formatMinutes(mins: number): string {
 }
 
 export default function Sessions() {
-  const { sessions, addSession, deleteSession, disciplines, checkMedals } = useStudyData();
+  const { sessions, addSession, updateSession, deleteSession, disciplines, checkMedals } = useStudyData();
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    startTime: '',
-    endTime: '',
-    pauseMinutes: 0,
-    discipline: '',
-    activity: '',
-    note: '',
+    startTime: '', endTime: '', pauseMinutes: 0,
+    discipline: '', activity: '', note: '',
   });
+  const [showSummary, setShowSummary] = useState(false);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
 
   const calculateDuration = () => {
     if (!form.startTime || !form.endTime) return 0;
     const [sh, sm] = form.startTime.split(':').map(Number);
     const [eh, em] = form.endTime.split(':').map(Number);
-    const totalMin = (eh * 60 + em) - (sh * 60 + sm) - form.pauseMinutes;
-    return Math.max(0, totalMin);
+    return Math.max(0, (eh * 60 + em) - (sh * 60 + sm) - form.pauseMinutes);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const duration = calculateDuration();
     if (duration <= 0) { toast.error('Duração inválida'); return; }
     if (!form.discipline) { toast.error('Selecione uma disciplina'); return; }
+    setShowSummary(true);
+  };
 
-    await addSession({
-      date: form.date,
-      startTime: form.startTime,
-      endTime: form.endTime,
-      pauseMinutes: form.pauseMinutes,
-      durationMinutes: duration,
-      discipline: form.discipline,
-      activity: form.activity,
-      note: form.note,
-    });
-
+  const handleConfirmNew = async (data: any) => {
+    await addSession(data);
     checkMedals();
-    toast.success(`Sessão de ${formatMinutes(duration)} salva!`);
+    toast.success(`Sessão de ${formatMinutes(data.durationMinutes)} salva!`);
     setForm(f => ({ ...f, startTime: '', endTime: '', pauseMinutes: 0, activity: '', note: '' }));
+    setShowSummary(false);
+  };
+
+  const handleEditSession = (session: Session) => {
+    setEditingSession(session);
+  };
+
+  const handleConfirmEdit = async (data: any) => {
+    if (!editingSession) return;
+    await updateSession(editingSession.id, data);
+    setEditingSession(null);
   };
 
   return (
@@ -64,14 +67,8 @@ export default function Sessions() {
         <p className="text-muted-foreground text-sm mt-1">Registre suas sessões de estudo</p>
       </div>
 
-      <motion.form
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        onSubmit={handleSubmit}
-        className="metric-card space-y-4"
-      >
+      <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={handleSubmit} className="metric-card space-y-4">
         <h3 className="text-sm font-semibold flex items-center gap-2"><Plus className="w-4 h-4" /> Nova Sessão</h3>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Data</Label>
@@ -103,17 +100,15 @@ export default function Sessions() {
             <Input value={form.activity} onChange={e => setForm(f => ({ ...f, activity: e.target.value }))} placeholder="Ex: Exercícios cap. 3" className="bg-secondary border-border/50" />
           </div>
         </div>
-
         <div className="space-y-1.5">
           <Label className="text-xs">Nota</Label>
           <Textarea value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="Observações..." rows={2} className="bg-secondary border-border/50" />
         </div>
-
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Duração: <span className="font-mono font-semibold text-foreground">{formatMinutes(calculateDuration())}</span>
           </p>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">Salvar Sessão</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90">Revisar e Salvar</Button>
         </div>
       </motion.form>
 
@@ -133,8 +128,11 @@ export default function Sessions() {
                     <p className="text-xs text-muted-foreground">{s.date} · {s.startTime}–{s.endTime}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="font-mono text-sm">{formatMinutes(s.durationMinutes)}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleEditSession(s)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteSession(s.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -144,6 +142,35 @@ export default function Sessions() {
           </div>
         )}
       </motion.div>
+
+      {/* New session summary */}
+      <SessionSummaryDialog
+        open={showSummary}
+        onOpenChange={setShowSummary}
+        initialData={{
+          date: form.date, startTime: form.startTime, endTime: form.endTime,
+          pauseMinutes: form.pauseMinutes, durationMinutes: calculateDuration(),
+          discipline: form.discipline, activity: form.activity, note: form.note,
+        }}
+        disciplines={disciplines}
+        onConfirm={handleConfirmNew}
+      />
+
+      {/* Edit session dialog */}
+      {editingSession && (
+        <SessionSummaryDialog
+          open={!!editingSession}
+          onOpenChange={open => { if (!open) setEditingSession(null); }}
+          initialData={{
+            date: editingSession.date, startTime: editingSession.startTime, endTime: editingSession.endTime,
+            pauseMinutes: editingSession.pauseMinutes, durationMinutes: editingSession.durationMinutes,
+            discipline: editingSession.discipline, activity: editingSession.activity, note: editingSession.note,
+          }}
+          disciplines={disciplines}
+          onConfirm={handleConfirmEdit}
+          title="Editar Sessão"
+        />
+      )}
     </div>
   );
 }
