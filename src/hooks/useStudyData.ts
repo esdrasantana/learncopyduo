@@ -14,15 +14,16 @@ const DEFAULT_GOALS: Goals = {
 };
 
 export function useStudyData() {
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [goals, setGoalsState] = useState<Goals>(DEFAULT_GOALS);
   const [disciplines, setDisciplinesState] = useState<Discipline[]>([]);
   const [medals, setMedalsState] = useState<Medal[]>(defaultMedals);
   const [loading, setLoading] = useState(true);
 
-  // Fetch all data
+  // Only fetch when auth is ready AND user exists
   useEffect(() => {
+    if (!isReady) return;
     if (!user) { setLoading(false); return; }
 
     const fetchAll = async () => {
@@ -36,48 +37,28 @@ export function useStudyData() {
 
       if (sessRes.data) {
         setSessions(sessRes.data.map(s => ({
-          id: s.id,
-          date: s.date,
-          startTime: s.start_time,
-          endTime: s.end_time,
-          pauseMinutes: s.pause_minutes,
-          durationMinutes: s.duration_minutes,
-          discipline: s.discipline,
-          activity: s.activity,
-          note: s.note,
-          createdAt: s.created_at,
+          id: s.id, date: s.date, startTime: s.start_time, endTime: s.end_time,
+          pauseMinutes: s.pause_minutes, durationMinutes: s.duration_minutes,
+          discipline: s.discipline, activity: s.activity, note: s.note, createdAt: s.created_at,
         })));
       }
 
       if (goalRes.data) {
         setGoalsState({
-          dailyMinutes: goalRes.data.daily_minutes,
-          weeklyMinutes: goalRes.data.weekly_minutes,
-          monthlyMinutes: goalRes.data.monthly_minutes,
-          totalDays: goalRes.data.total_days,
+          dailyMinutes: goalRes.data.daily_minutes, weeklyMinutes: goalRes.data.weekly_minutes,
+          monthlyMinutes: goalRes.data.monthly_minutes, totalDays: goalRes.data.total_days,
           totalHours: goalRes.data.total_hours,
         });
       }
 
       if (discRes.data) {
-        setDisciplinesState(discRes.data.map(d => ({
-          id: d.id,
-          name: d.name,
-          color: d.color,
-        })));
+        setDisciplinesState(discRes.data.map(d => ({ id: d.id, name: d.name, color: d.color })));
       }
 
       if (medalRes.data) {
         setMedalsState(defaultMedals.map(dm => {
           const dbMedal = medalRes.data.find(m => m.medal_id === dm.id);
-          if (dbMedal) {
-            return {
-              ...dm,
-              currentValue: Number(dbMedal.current_value),
-              unlocked: dbMedal.unlocked,
-              unlockedAt: dbMedal.unlocked_at,
-            };
-          }
+          if (dbMedal) return { ...dm, currentValue: Number(dbMedal.current_value), unlocked: dbMedal.unlocked, unlockedAt: dbMedal.unlocked_at };
           return dm;
         }));
       }
@@ -86,38 +67,36 @@ export function useStudyData() {
     };
 
     fetchAll();
-  }, [user]);
+  }, [user, isReady]);
 
   const addSession = useCallback(async (session: Omit<Session, 'id' | 'createdAt'>) => {
     if (!user) return null;
     const { data, error } = await supabase.from('sessions').insert({
-      user_id: user.id,
-      date: session.date,
-      start_time: session.startTime,
-      end_time: session.endTime,
-      pause_minutes: session.pauseMinutes,
-      duration_minutes: session.durationMinutes,
-      discipline: session.discipline,
-      activity: session.activity,
-      note: session.note,
+      user_id: user.id, date: session.date, start_time: session.startTime,
+      end_time: session.endTime, pause_minutes: session.pauseMinutes,
+      duration_minutes: session.durationMinutes, discipline: session.discipline,
+      activity: session.activity, note: session.note,
     }).select().single();
-
     if (error) { toast.error('Erro ao salvar sessão'); return null; }
-
     const newSession: Session = {
-      id: data.id,
-      date: data.date,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      pauseMinutes: data.pause_minutes,
-      durationMinutes: data.duration_minutes,
-      discipline: data.discipline,
-      activity: data.activity,
-      note: data.note,
-      createdAt: data.created_at,
+      id: data.id, date: data.date, startTime: data.start_time, endTime: data.end_time,
+      pauseMinutes: data.pause_minutes, durationMinutes: data.duration_minutes,
+      discipline: data.discipline, activity: data.activity, note: data.note, createdAt: data.created_at,
     };
     setSessions(prev => [newSession, ...prev]);
     return newSession;
+  }, [user]);
+
+  const updateSession = useCallback(async (id: string, session: Omit<Session, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    const { error } = await supabase.from('sessions').update({
+      date: session.date, start_time: session.startTime, end_time: session.endTime,
+      pause_minutes: session.pauseMinutes, duration_minutes: session.durationMinutes,
+      discipline: session.discipline, activity: session.activity, note: session.note,
+    }).eq('id', id).eq('user_id', user.id);
+    if (error) { toast.error('Erro ao atualizar sessão'); return; }
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, ...session } : s));
+    toast.success('Sessão atualizada!');
   }, [user]);
 
   const deleteSession = useCallback(async (id: string) => {
@@ -130,19 +109,42 @@ export function useStudyData() {
   const setGoals = useCallback(async (newGoals: Goals) => {
     if (!user) return;
     const { error } = await supabase.from('goals').update({
-      daily_minutes: newGoals.dailyMinutes,
-      weekly_minutes: newGoals.weeklyMinutes,
-      monthly_minutes: newGoals.monthlyMinutes,
-      total_days: newGoals.totalDays,
+      daily_minutes: newGoals.dailyMinutes, weekly_minutes: newGoals.weeklyMinutes,
+      monthly_minutes: newGoals.monthlyMinutes, total_days: newGoals.totalDays,
       total_hours: newGoals.totalHours,
     }).eq('user_id', user.id);
     if (error) { toast.error('Erro ao salvar metas'); return; }
     setGoalsState(newGoals);
   }, [user]);
 
+  // Individual discipline CRUD
+  const addDiscipline = useCallback(async (name: string, color: string) => {
+    if (!user) return;
+    const { data, error } = await supabase.from('disciplines').insert({ user_id: user.id, name, color }).select().single();
+    if (error) { toast.error('Erro ao criar disciplina'); return; }
+    setDisciplinesState(prev => [...prev, { id: data.id, name: data.name, color: data.color }]);
+    toast.success('Disciplina criada!');
+  }, [user]);
+
+  const updateDiscipline = useCallback(async (id: string, name: string, color: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('disciplines').update({ name, color }).eq('id', id).eq('user_id', user.id);
+    if (error) { toast.error('Erro ao atualizar disciplina'); return; }
+    setDisciplinesState(prev => prev.map(d => d.id === id ? { ...d, name, color } : d));
+    toast.success('Disciplina atualizada!');
+  }, [user]);
+
+  const deleteDiscipline = useCallback(async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('disciplines').delete().eq('id', id).eq('user_id', user.id);
+    if (error) { toast.error('Erro ao excluir disciplina'); return; }
+    setDisciplinesState(prev => prev.filter(d => d.id !== id));
+    toast.success('Disciplina excluída!');
+  }, [user]);
+
+  // Keep legacy setDisciplines for compatibility
   const setDisciplines = useCallback(async (newDisciplines: Discipline[]) => {
     if (!user) return;
-    // Simple approach: delete all and re-insert
     await supabase.from('disciplines').delete().eq('user_id', user.id);
     const { error } = await supabase.from('disciplines').insert(
       newDisciplines.map(d => ({ user_id: user.id, name: d.name, color: d.color }))
@@ -152,17 +154,9 @@ export function useStudyData() {
   }, [user]);
 
   const totalMinutes = useMemo(() => sessions.reduce((sum, s) => sum + s.durationMinutes, 0), [sessions]);
-
-  const studyDays = useMemo(() => {
-    const days = new Set(sessions.map(s => s.date));
-    return days.size;
-  }, [sessions]);
-
+  const studyDays = useMemo(() => new Set(sessions.map(s => s.date)).size, [sessions]);
   const getSessionsByDate = useCallback((date: string) => sessions.filter(s => s.date === date), [sessions]);
-
-  const getMinutesByDate = useCallback((date: string) => {
-    return sessions.filter(s => s.date === date).reduce((sum, s) => sum + s.durationMinutes, 0);
-  }, [sessions]);
+  const getMinutesByDate = useCallback((date: string) => sessions.filter(s => s.date === date).reduce((sum, s) => sum + s.durationMinutes, 0), [sessions]);
 
   const streak = useMemo(() => {
     if (sessions.length === 0) return 0;
@@ -185,12 +179,14 @@ export function useStudyData() {
   const stockPrice = useMemo(() => {
     const dates = [...new Set(sessions.map(s => s.date))].sort();
     let accumulated = 0;
+    const history: { date: string; value: number }[] = [];
     for (const date of dates) {
       const mins = getMinutesByDate(date);
       const diff = mins - goals.dailyMinutes;
-      if (diff < 0) accumulated += diff;
+      accumulated += diff;
+      history.push({ date, value: accumulated });
     }
-    return { accumulated, compensationNeeded: Math.abs(accumulated) };
+    return { accumulated, compensationNeeded: Math.abs(Math.min(0, accumulated)), history };
   }, [sessions, goals.dailyMinutes, getMinutesByDate]);
 
   const checkMedals = useCallback(async () => {
@@ -204,40 +200,28 @@ export function useStudyData() {
           currentValue = totalMinutes / 60; break;
         case 'streak-7': currentValue = streak; break;
         case 'single-6h': case 'single-10h': {
-          const dates = [...new Set(sessions.map(s => s.date))];
-          currentValue = Math.max(0, ...dates.map(d => getMinutesByDate(d))) / 60;
+          const allDates = [...new Set(sessions.map(s => s.date))];
+          currentValue = Math.max(0, ...allDates.map(d => getMinutesByDate(d))) / 60;
           break;
         }
         default: currentValue = medal.currentValue;
       }
       const unlocked = currentValue >= medal.targetValue;
-      if (unlocked && !medal.unlocked) {
-        toast.success(`🏅 Medalha desbloqueada: ${medal.name}!`);
-      }
-      return {
-        ...medal,
-        currentValue,
-        unlocked,
-        unlockedAt: unlocked ? new Date().toISOString() : null,
-      };
+      if (unlocked && !medal.unlocked) toast.success(`🏅 Medalha desbloqueada: ${medal.name}!`);
+      return { ...medal, currentValue, unlocked, unlockedAt: unlocked ? new Date().toISOString() : null };
     });
-
-    // Persist to DB
     for (const medal of updated) {
       await supabase.from('medals').update({
-        current_value: medal.currentValue,
-        unlocked: medal.unlocked,
-        unlocked_at: medal.unlockedAt,
+        current_value: medal.currentValue, unlocked: medal.unlocked, unlocked_at: medal.unlockedAt,
       }).eq('user_id', user.id).eq('medal_id', medal.id);
     }
-
     setMedalsState(updated);
   }, [user, medals, totalMinutes, streak, sessions, getMinutesByDate]);
 
   return {
-    sessions, addSession, deleteSession,
+    sessions, addSession, updateSession, deleteSession,
     goals, setGoals,
-    disciplines, setDisciplines,
+    disciplines, setDisciplines, addDiscipline, updateDiscipline, deleteDiscipline,
     medals, checkMedals,
     totalMinutes, studyDays, streak, stockPrice,
     getSessionsByDate, getMinutesByDate,

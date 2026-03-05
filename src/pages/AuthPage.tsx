@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,31 +10,62 @@ import { LogIn, UserPlus, KeyRound } from 'lucide-react';
 
 type Mode = 'login' | 'signup' | 'forgot';
 
+function translateError(message: string): string {
+  if (message.includes('Invalid login credentials')) return 'Email ou senha incorretos.';
+  if (message.includes('Email not confirmed')) return 'Email não confirmado. Verifique sua caixa de entrada.';
+  if (message.includes('User already registered')) return 'Este email já está cadastrado.';
+  if (message.includes('Password should be at least')) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (message.includes('Unable to validate email')) return 'Email inválido.';
+  if (message.includes('rate limit')) return 'Muitas tentativas. Aguarde um momento.';
+  if (message.includes('network') || message.includes('fetch')) return 'Erro de conexão. Verifique sua internet.';
+  return message;
+}
+
 export default function AuthPage() {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, user } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Redirect if already logged in
+  if (user) {
+    navigate('/', { replace: true });
+    return null;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (mode === 'forgot') {
-      const { error } = await resetPassword(email);
-      if (error) toast.error(error.message);
-      else toast.success('Email de recuperação enviado!');
-      setLoading(false);
-      return;
-    }
+    try {
+      if (mode === 'forgot') {
+        const { error } = await resetPassword(email);
+        if (error) toast.error(translateError(error.message));
+        else toast.success('Email de recuperação enviado!');
+        setLoading(false);
+        return;
+      }
 
-    const action = mode === 'login' ? signIn : signUp;
-    const { error } = await action(email, password);
-    if (error) {
-      toast.error(error.message);
-    } else if (mode === 'signup') {
-      toast.success('Conta criada! Verifique seu email para confirmar.');
+      if (mode === 'signup') {
+        const { error } = await signUp(email, password);
+        if (error) {
+          toast.error(translateError(error.message));
+        } else {
+          toast.success('Conta criada com sucesso!');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Login
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast.error(translateError(error.message));
+      }
+    } catch (err: any) {
+      toast.error('Erro inesperado. Tente novamente.');
     }
     setLoading(false);
   };

@@ -1,39 +1,63 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Play, Pause, Save, RotateCcw } from 'lucide-react';
+import SessionSummaryDialog from '@/components/SessionSummaryDialog';
 
 export default function TimerPage() {
   const { addSession, disciplines, checkMedals } = useStudyData();
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [pauseSeconds, setPauseSeconds] = useState(0);
-  const [startTime, setStartTime] = useState<string>('');
   const [discipline, setDiscipline] = useState('');
-  const intervalRef = useRef<number | null>(null);
-  const pauseIntervalRef = useRef<number | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
-  useEffect(() => {
-    if (isRunning && !isPaused) {
-      intervalRef.current = window.setInterval(() => setSeconds(s => s + 1), 1000);
+  // Timestamp-based tracking
+  const [startTimestamp, setStartTimestamp] = useState<number>(0);
+  const [pauseStart, setPauseStart] = useState<number>(0);
+  const [accumulatedPause, setAccumulatedPause] = useState(0);
+  const [displaySeconds, setDisplaySeconds] = useState(0);
+  const [pauseDisplaySeconds, setPauseDisplaySeconds] = useState(0);
+  const [startTimeStr, setStartTimeStr] = useState('');
+
+  const intervalRef = useRef<number | null>(null);
+
+  const recalculate = useCallback(() => {
+    if (!isRunning) return;
+    const now = Date.now();
+    if (isPaused) {
+      const currentPause = now - pauseStart;
+      const totalElapsed = now - startTimestamp - accumulatedPause - currentPause;
+      setDisplaySeconds(Math.max(0, Math.floor(totalElapsed / 1000)));
+      setPauseDisplaySeconds(Math.floor((accumulatedPause + currentPause) / 1000));
     } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      const totalElapsed = now - startTimestamp - accumulatedPause;
+      setDisplaySeconds(Math.max(0, Math.floor(totalElapsed / 1000)));
+      setPauseDisplaySeconds(Math.floor(accumulatedPause / 1000));
+    }
+  }, [isRunning, isPaused, startTimestamp, pauseStart, accumulatedPause]);
+
+  // Main tick interval
+  useEffect(() => {
+    if (isRunning) {
+      recalculate();
+      intervalRef.current = window.setInterval(recalculate, 1000);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, isPaused]);
+  }, [isRunning, recalculate]);
 
+  // Visibility change handler - recalculate on tab focus
   useEffect(() => {
-    if (isPaused) {
-      pauseIntervalRef.current = window.setInterval(() => setPauseSeconds(s => s + 1), 1000);
-    } else {
-      if (pauseIntervalRef.current) clearInterval(pauseIntervalRef.current);
-    }
-    return () => { if (pauseIntervalRef.current) clearInterval(pauseIntervalRef.current); };
-  }, [isPaused]);
+    const handler = () => {
+      if (document.visibilityState === 'visible' && isRunning) {
+        recalculate();
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [isRunning, recalculate]);
 
   const formatTime = (s: number) => {
     const h = Math.floor(s / 3600);
@@ -44,74 +68,90 @@ export default function TimerPage() {
 
   const handleStart = () => {
     if (!discipline) { toast.error('Selecione uma disciplina'); return; }
+    const now = Date.now();
+    setStartTimestamp(now);
+    setAccumulatedPause(0);
+    setPauseStart(0);
+    setDisplaySeconds(0);
+    setPauseDisplaySeconds(0);
     setIsRunning(true);
     setIsPaused(false);
-    const now = new Date();
-    setStartTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+    const d = new Date(now);
+    setStartTimeStr(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
   };
 
-  const handlePause = () => setIsPaused(p => !p);
+  const handlePause = () => {
+    if (isPaused) {
+      // Resume: accumulate pause duration
+      const pauseDuration = Date.now() - pauseStart;
+      setAccumulatedPause(prev => prev + pauseDuration);
+      setPauseStart(0);
+      setIsPaused(false);
+    } else {
+      // Pause: record pause start
+      setPauseStart(Date.now());
+      setIsPaused(true);
+    }
+  };
 
-  const handleSave = async () => {
-    const totalMinutes = Math.floor(seconds / 60);
-    const pauseMinutes = Math.floor(pauseSeconds / 60);
-    const duration = totalMinutes - pauseMinutes;
-    if (duration <= 0) { toast.error('Duração muito curta'); return; }
+  const handleSave = () => {
+    const totalStudySeconds = displaySeconds;
+    const totalMinutes = Math.floor(totalStudySeconds / 60);
+    if (totalMinutes <= 0) { toast.error('Duração muito curta'); return; }
+    setShowSummary(true);
+  };
 
-    const now = new Date();
-    const endTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-    await addSession({
-      date: new Date().toISOString().split('T')[0],
-      startTime,
-      endTime,
-      pauseMinutes,
-      durationMinutes: duration,
-      discipline,
-      activity: 'Timer',
-      note: '',
-    });
-
+  const handleConfirmSave = async (data: {
+    date: string; startTime: string; endTime: string;
+    pauseMinutes: number; durationMinutes: number;
+    discipline: string; activity: string; note: string;
+  }) => {
+    await addSession(data);
     checkMedals();
-    toast.success(`Sessão de ${Math.floor(duration / 60)}h ${duration % 60}min salva!`);
+    toast.success(`Sessão de ${Math.floor(data.durationMinutes / 60)}h ${data.durationMinutes % 60}min salva!`);
     handleReset();
+    setShowSummary(false);
   };
 
   const handleReset = () => {
     setIsRunning(false);
     setIsPaused(false);
-    setSeconds(0);
-    setPauseSeconds(0);
-    setStartTime('');
+    setStartTimestamp(0);
+    setPauseStart(0);
+    setAccumulatedPause(0);
+    setDisplaySeconds(0);
+    setPauseDisplaySeconds(0);
+    setStartTimeStr('');
   };
+
+  const now = new Date();
+  const endTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-8">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-6">
         <h1 className="text-xl font-bold text-muted-foreground uppercase tracking-widest">Modo Foco</h1>
 
-        {/* Timer display */}
         <div className={`relative ${isRunning && !isPaused ? 'glow-primary' : ''} rounded-full p-1`}>
           <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-2 border-border/50 bg-card flex items-center justify-center">
             <span className="font-mono text-5xl md:text-6xl font-bold tracking-tight text-foreground">
-              {formatTime(seconds)}
+              {formatTime(displaySeconds)}
             </span>
           </div>
         </div>
 
         {isPaused && (
-          <p className="text-sm text-warning font-mono animate-pulse-glow">
-            ⏸ Pausado — {formatTime(pauseSeconds)}
+          <p className="text-sm text-warning font-mono animate-pulse">
+            ⏸ Pausado — {formatTime(pauseDisplaySeconds)}
           </p>
         )}
 
-        {startTime && (
+        {startTimeStr && (
           <p className="text-sm text-muted-foreground">
-            Início: <span className="font-mono text-foreground">{startTime}</span>
+            Início: <span className="font-mono text-foreground">{startTimeStr}</span>
           </p>
         )}
 
-        {/* Discipline select */}
         <div className="w-60 mx-auto">
           <Select value={discipline} onValueChange={setDiscipline} disabled={isRunning}>
             <SelectTrigger className="bg-secondary border-border/50">
@@ -123,7 +163,6 @@ export default function TimerPage() {
           </Select>
         </div>
 
-        {/* Controls */}
         <div className="flex items-center justify-center gap-3">
           {!isRunning ? (
             <Button onClick={handleStart} size="lg" className="bg-primary hover:bg-primary/90 gap-2">
@@ -145,6 +184,23 @@ export default function TimerPage() {
           )}
         </div>
       </motion.div>
+
+      <SessionSummaryDialog
+        open={showSummary}
+        onOpenChange={setShowSummary}
+        initialData={{
+          date: new Date().toISOString().split('T')[0],
+          startTime: startTimeStr,
+          endTime: endTimeStr,
+          pauseMinutes: Math.floor(accumulatedPause / 60000),
+          durationMinutes: Math.floor(displaySeconds / 60),
+          discipline,
+          activity: 'Timer',
+          note: '',
+        }}
+        disciplines={disciplines}
+        onConfirm={handleConfirmSave}
+      />
     </div>
   );
 }
