@@ -23,6 +23,7 @@ export interface Goals {
   monthlyMinutes: number;
   totalDays: number;
   totalHours: number;
+  studyDays: number[];
 }
 
 export interface Medal {

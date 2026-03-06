@@ -2,19 +2,24 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Play, Pause, Save, RotateCcw } from 'lucide-react';
+import { Play, Pause, Save, RotateCcw, Plus } from 'lucide-react';
 import SessionSummaryDialog from '@/components/SessionSummaryDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export default function TimerPage() {
-  const { addSession, disciplines, checkMedals } = useStudyData();
+  const { addSession, disciplines, checkMedals, addDiscipline } = useStudyData();
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [discipline, setDiscipline] = useState('');
   const [showSummary, setShowSummary] = useState(false);
+  const [showNewDisc, setShowNewDisc] = useState(false);
+  const [newDiscName, setNewDiscName] = useState('');
+  const [newDiscColor, setNewDiscColor] = useState('#3b82f6');
 
-  // Timestamp-based tracking
   const [startTimestamp, setStartTimestamp] = useState<number>(0);
   const [pauseStart, setPauseStart] = useState<number>(0);
   const [accumulatedPause, setAccumulatedPause] = useState(0);
@@ -39,7 +44,6 @@ export default function TimerPage() {
     }
   }, [isRunning, isPaused, startTimestamp, pauseStart, accumulatedPause]);
 
-  // Main tick interval
   useEffect(() => {
     if (isRunning) {
       recalculate();
@@ -48,12 +52,9 @@ export default function TimerPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, recalculate]);
 
-  // Visibility change handler - recalculate on tab focus
   useEffect(() => {
     const handler = () => {
-      if (document.visibilityState === 'visible' && isRunning) {
-        recalculate();
-      }
+      if (document.visibilityState === 'visible' && isRunning) recalculate();
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
@@ -82,21 +83,18 @@ export default function TimerPage() {
 
   const handlePause = () => {
     if (isPaused) {
-      // Resume: accumulate pause duration
       const pauseDuration = Date.now() - pauseStart;
       setAccumulatedPause(prev => prev + pauseDuration);
       setPauseStart(0);
       setIsPaused(false);
     } else {
-      // Pause: record pause start
       setPauseStart(Date.now());
       setIsPaused(true);
     }
   };
 
   const handleSave = () => {
-    const totalStudySeconds = displaySeconds;
-    const totalMinutes = Math.floor(totalStudySeconds / 60);
+    const totalMinutes = Math.floor(displaySeconds / 60);
     if (totalMinutes <= 0) { toast.error('Duração muito curta'); return; }
     setShowSummary(true);
   };
@@ -122,6 +120,15 @@ export default function TimerPage() {
     setDisplaySeconds(0);
     setPauseDisplaySeconds(0);
     setStartTimeStr('');
+  };
+
+  const handleCreateDiscipline = async () => {
+    if (!newDiscName.trim()) { toast.error('Nome obrigatório'); return; }
+    await addDiscipline(newDiscName.trim(), newDiscColor);
+    setDiscipline(newDiscName.trim());
+    setNewDiscName('');
+    setNewDiscColor('#3b82f6');
+    setShowNewDisc(false);
   };
 
   const now = new Date();
@@ -152,13 +159,18 @@ export default function TimerPage() {
           </p>
         )}
 
-        <div className="w-60 mx-auto">
-          <Select value={discipline} onValueChange={setDiscipline} disabled={isRunning}>
+        <div className="w-60 mx-auto space-y-2">
+          <Select value={discipline} onValueChange={(v) => { if (v === '__new__') setShowNewDisc(true); else setDiscipline(v); }} disabled={isRunning}>
             <SelectTrigger className="bg-secondary border-border/50">
               <SelectValue placeholder="Disciplina" />
             </SelectTrigger>
             <SelectContent>
               {disciplines.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+              <SelectItem value="__new__">
+                <span className="flex items-center gap-1.5 text-primary">
+                  <Plus className="w-3.5 h-3.5" /> Nova Disciplina
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -201,6 +213,30 @@ export default function TimerPage() {
         disciplines={disciplines}
         onConfirm={handleConfirmSave}
       />
+
+      {/* Quick discipline creation dialog */}
+      <Dialog open={showNewDisc} onOpenChange={setShowNewDisc}>
+        <DialogContent className="sm:max-w-sm bg-card border-border/50">
+          <DialogHeader><DialogTitle>Nova Disciplina</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome</Label>
+              <Input value={newDiscName} onChange={e => setNewDiscName(e.target.value)} placeholder="Ex: Direito Constitucional" className="bg-secondary border-border/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cor</Label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={newDiscColor} onChange={e => setNewDiscColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0" />
+                <span className="text-xs text-muted-foreground font-mono">{newDiscColor}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewDisc(false)}>Cancelar</Button>
+            <Button onClick={handleCreateDiscipline}>Criar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

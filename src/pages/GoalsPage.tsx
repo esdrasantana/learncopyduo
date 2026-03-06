@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,23 @@ import MetricCard from '@/components/MetricCard';
 import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${h}h ${m.toString().padStart(2, '0')}min`;
 }
+
+const WEEKDAY_LABELS = [
+  { value: 0, label: 'Dom' },
+  { value: 1, label: 'Seg' },
+  { value: 2, label: 'Ter' },
+  { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' },
+  { value: 5, label: 'Sex' },
+  { value: 6, label: 'Sáb' },
+];
 
 export default function GoalsPage() {
   const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline } = useStudyData();
@@ -25,13 +36,38 @@ export default function GoalsPage() {
   const [editColor, setEditColor] = useState('');
   const [showAddDisc, setShowAddDisc] = useState(false);
 
+  const dailyHours = goals.dailyMinutes / 60;
+  const studyDaysPerWeek = goals.studyDays.length;
+  const autoWeeklyMinutes = goals.dailyMinutes * studyDaysPerWeek;
+  const autoMonthlyMinutes = Math.round(autoWeeklyMinutes * 4.33);
+
   const remainingMinutes = Math.max(0, goals.totalHours * 60 - totalMinutes);
   const remainingDays = Math.max(0, goals.totalDays - studyDays);
   const requiredPace = remainingDays > 0 ? Math.round(remainingMinutes / remainingDays) : 0;
   const projectedDays = goals.dailyMinutes > 0 ? Math.ceil(remainingMinutes / goals.dailyMinutes) : 0;
 
-  const handleSaveGoal = (field: keyof typeof goals, valueInHours: number, isHourField: boolean) => {
-    const value = isHourField ? Math.round(valueInHours * 60) : valueInHours;
+  const handleDailyChange = (valueHours: number) => {
+    const dailyMin = Math.round(valueHours * 60);
+    const weeklyMin = dailyMin * studyDaysPerWeek;
+    const monthlyMin = Math.round(weeklyMin * 4.33);
+    setGoals({ ...goals, dailyMinutes: dailyMin, weeklyMinutes: weeklyMin, monthlyMinutes: monthlyMin });
+    toast.success('Meta atualizada!');
+  };
+
+  const handleStudyDayToggle = (day: number) => {
+    let newDays: number[];
+    if (goals.studyDays.includes(day)) {
+      newDays = goals.studyDays.filter(d => d !== day);
+      if (newDays.length === 0) { toast.error('Selecione pelo menos 1 dia'); return; }
+    } else {
+      newDays = [...goals.studyDays, day].sort();
+    }
+    const weeklyMin = goals.dailyMinutes * newDays.length;
+    const monthlyMin = Math.round(weeklyMin * 4.33);
+    setGoals({ ...goals, studyDays: newDays, weeklyMinutes: weeklyMin, monthlyMinutes: monthlyMin });
+  };
+
+  const handleSaveField = (field: 'totalDays' | 'totalHours', value: number) => {
     setGoals({ ...goals, [field]: value });
     toast.success('Meta atualizada!');
   };
@@ -56,14 +92,6 @@ export default function GoalsPage() {
     setEditingId(null);
   };
 
-  const goalFields = [
-    { label: 'Meta Diária (horas)', field: 'dailyMinutes' as const, displayValue: goals.dailyMinutes / 60, isHour: true },
-    { label: 'Meta Semanal (horas)', field: 'weeklyMinutes' as const, displayValue: goals.weeklyMinutes / 60, isHour: true },
-    { label: 'Meta Mensal (horas)', field: 'monthlyMinutes' as const, displayValue: goals.monthlyMinutes / 60, isHour: true },
-    { label: 'Total de Dias', field: 'totalDays' as const, displayValue: goals.totalDays, isHour: false },
-    { label: 'Total de Horas', field: 'totalHours' as const, displayValue: goals.totalHours, isHour: false },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -78,23 +106,85 @@ export default function GoalsPage() {
         <MetricCard title="Dias Restantes" value={remainingDays} icon={Target} variant={remainingDays < 30 ? 'danger' : 'default'} />
       </div>
 
-      {/* Goals config */}
+      {/* Smart Goals */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="metric-card space-y-5">
         <h3 className="text-sm font-semibold">Configurar Metas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {goalFields.map(item => (
-            <div key={item.field} className="space-y-1.5">
-              <Label className="text-xs">{item.label}</Label>
-              <Input
-                type="number"
-                min={0}
-                step={item.isHour ? 0.5 : 1}
-                defaultValue={item.displayValue}
-                className="bg-secondary border-border/50"
-                onBlur={e => handleSaveGoal(item.field, Number(e.target.value), item.isHour)}
-              />
-            </div>
-          ))}
+
+        {/* Daily goal */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Meta Diária (horas)</Label>
+          <Input
+            type="number"
+            min={0}
+            step={0.5}
+            defaultValue={dailyHours}
+            className="bg-secondary border-border/50 max-w-[200px]"
+            onBlur={e => handleDailyChange(Number(e.target.value))}
+          />
+        </div>
+
+        {/* Study days */}
+        <div className="space-y-2">
+          <Label className="text-xs">Dias de Estudo</Label>
+          <div className="flex flex-wrap gap-2">
+            {WEEKDAY_LABELS.map(wd => (
+              <label
+                key={wd.value}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer text-xs font-medium transition-colors ${
+                  goals.studyDays.includes(wd.value)
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'bg-secondary/50 text-muted-foreground border border-border/30'
+                }`}
+              >
+                <Checkbox
+                  checked={goals.studyDays.includes(wd.value)}
+                  onCheckedChange={() => handleStudyDayToggle(wd.value)}
+                  className="h-3.5 w-3.5"
+                />
+                {wd.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Auto-calculated */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Meta Semanal</Label>
+            <p className="text-sm font-mono font-semibold">{formatMinutes(autoWeeklyMinutes)}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Meta Mensal</Label>
+            <p className="text-sm font-mono font-semibold">{formatMinutes(autoMonthlyMinutes)}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Dias/semana</Label>
+            <p className="text-sm font-mono font-semibold">{studyDaysPerWeek} dias</p>
+          </div>
+        </div>
+
+        {/* Total goals */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/30">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Total de Dias</Label>
+            <Input
+              type="number"
+              min={1}
+              defaultValue={goals.totalDays}
+              className="bg-secondary border-border/50"
+              onBlur={e => handleSaveField('totalDays', Number(e.target.value))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Total de Horas</Label>
+            <Input
+              type="number"
+              min={1}
+              defaultValue={goals.totalHours}
+              className="bg-secondary border-border/50"
+              onBlur={e => handleSaveField('totalHours', Number(e.target.value))}
+            />
+          </div>
         </div>
       </motion.div>
 

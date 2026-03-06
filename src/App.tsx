@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { StudyDataProvider } from "@/hooks/useStudyData";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Sessions from "@/pages/Sessions";
@@ -57,11 +58,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
+          <StudyDataProvider>
+            <Routes>
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </StudyDataProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

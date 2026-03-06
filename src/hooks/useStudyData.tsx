@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { createContext, useContext, useCallback, useMemo, useEffect, useState, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -11,9 +11,35 @@ const DEFAULT_GOALS: Goals = {
   monthlyMinutes: 9000,
   totalDays: 120,
   totalHours: 720,
+  studyDays: [1, 2, 3, 4, 5],
 };
 
-export function useStudyData() {
+interface StudyDataContextType {
+  sessions: Session[];
+  addSession: (session: Omit<Session, 'id' | 'createdAt'>) => Promise<Session | null>;
+  updateSession: (id: string, session: Omit<Session, 'id' | 'createdAt'>) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
+  goals: Goals;
+  setGoals: (goals: Goals) => Promise<void>;
+  disciplines: Discipline[];
+  setDisciplines: (disciplines: Discipline[]) => Promise<void>;
+  addDiscipline: (name: string, color: string) => Promise<void>;
+  updateDiscipline: (id: string, name: string, color: string) => Promise<void>;
+  deleteDiscipline: (id: string) => Promise<void>;
+  medals: Medal[];
+  checkMedals: () => Promise<void>;
+  totalMinutes: number;
+  studyDays: number;
+  streak: number;
+  stockPrice: { accumulated: number; compensationNeeded: number; history: { date: string; value: number }[] };
+  getSessionsByDate: (date: string) => Session[];
+  getMinutesByDate: (date: string) => number;
+  loading: boolean;
+}
+
+const StudyDataContext = createContext<StudyDataContextType | null>(null);
+
+export function StudyDataProvider({ children }: { children: ReactNode }) {
   const { user, isReady } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [goals, setGoalsState] = useState<Goals>(DEFAULT_GOALS);
@@ -21,7 +47,6 @@ export function useStudyData() {
   const [medals, setMedalsState] = useState<Medal[]>(defaultMedals);
   const [loading, setLoading] = useState(true);
 
-  // Only fetch when auth is ready AND user exists
   useEffect(() => {
     if (!isReady) return;
     if (!user) { setLoading(false); return; }
@@ -44,10 +69,12 @@ export function useStudyData() {
       }
 
       if (goalRes.data) {
+        const rawStudyDays = (goalRes.data as any).study_days;
         setGoalsState({
           dailyMinutes: goalRes.data.daily_minutes, weeklyMinutes: goalRes.data.weekly_minutes,
           monthlyMinutes: goalRes.data.monthly_minutes, totalDays: goalRes.data.total_days,
           totalHours: goalRes.data.total_hours,
+          studyDays: Array.isArray(rawStudyDays) ? rawStudyDays : [1, 2, 3, 4, 5],
         });
       }
 
@@ -111,13 +138,12 @@ export function useStudyData() {
     const { error } = await supabase.from('goals').update({
       daily_minutes: newGoals.dailyMinutes, weekly_minutes: newGoals.weeklyMinutes,
       monthly_minutes: newGoals.monthlyMinutes, total_days: newGoals.totalDays,
-      total_hours: newGoals.totalHours,
-    }).eq('user_id', user.id);
+      total_hours: newGoals.totalHours, study_days: newGoals.studyDays as any,
+    } as any).eq('user_id', user.id);
     if (error) { toast.error('Erro ao salvar metas'); return; }
     setGoalsState(newGoals);
   }, [user]);
 
-  // Individual discipline CRUD
   const addDiscipline = useCallback(async (name: string, color: string) => {
     if (!user) return;
     const { data, error } = await supabase.from('disciplines').insert({ user_id: user.id, name, color }).select().single();
@@ -142,7 +168,6 @@ export function useStudyData() {
     toast.success('Disciplina excluída!');
   }, [user]);
 
-  // Keep legacy setDisciplines for compatibility
   const setDisciplines = useCallback(async (newDisciplines: Discipline[]) => {
     if (!user) return;
     await supabase.from('disciplines').delete().eq('user_id', user.id);
@@ -154,7 +179,7 @@ export function useStudyData() {
   }, [user]);
 
   const totalMinutes = useMemo(() => sessions.reduce((sum, s) => sum + s.durationMinutes, 0), [sessions]);
-  const studyDays = useMemo(() => new Set(sessions.map(s => s.date)).size, [sessions]);
+  const studyDaysCount = useMemo(() => new Set(sessions.map(s => s.date)).size, [sessions]);
   const getSessionsByDate = useCallback((date: string) => sessions.filter(s => s.date === date), [sessions]);
   const getMinutesByDate = useCallback((date: string) => sessions.filter(s => s.date === date).reduce((sum, s) => sum + s.durationMinutes, 0), [sessions]);
 
@@ -163,18 +188,26 @@ export function useStudyData() {
     const dates = [...new Set(sessions.map(s => s.date))].sort().reverse();
     let count = 0;
     const today = new Date();
+    const activeStudyDays = goals.studyDays;
     for (let i = 0; i < 365; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
+      const dayOfWeek = checkDate.getDay(); // 0=Sun, 1=Mon...
       const dateStr = checkDate.toISOString().split('T')[0];
+      
+      // Skip non-study days
+      if (!activeStudyDays.includes(dayOfWeek)) continue;
+      
       if (dates.includes(dateStr)) {
         const mins = getMinutesByDate(dateStr);
         if (mins >= goals.dailyMinutes) count++;
-        else if (i > 0) break;
-      } else if (i > 0) break;
+        else if (count > 0) break;
+        else break;
+      } else if (count > 0) break;
+      else break;
     }
     return count;
-  }, [sessions, goals.dailyMinutes, getMinutesByDate]);
+  }, [sessions, goals.dailyMinutes, goals.studyDays, getMinutesByDate]);
 
   const stockPrice = useMemo(() => {
     const dates = [...new Set(sessions.map(s => s.date))].sort();
@@ -218,13 +251,21 @@ export function useStudyData() {
     setMedalsState(updated);
   }, [user, medals, totalMinutes, streak, sessions, getMinutesByDate]);
 
-  return {
+  const value: StudyDataContextType = {
     sessions, addSession, updateSession, deleteSession,
     goals, setGoals,
     disciplines, setDisciplines, addDiscipline, updateDiscipline, deleteDiscipline,
     medals, checkMedals,
-    totalMinutes, studyDays, streak, stockPrice,
+    totalMinutes, studyDays: studyDaysCount, streak, stockPrice,
     getSessionsByDate, getMinutesByDate,
     loading,
   };
+
+  return <StudyDataContext.Provider value={value}>{children}</StudyDataContext.Provider>;
+}
+
+export function useStudyData(): StudyDataContextType {
+  const context = useContext(StudyDataContext);
+  if (!context) throw new Error('useStudyData must be used within StudyDataProvider');
+  return context;
 }

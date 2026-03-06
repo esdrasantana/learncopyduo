@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+} from 'recharts';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -73,6 +77,18 @@ export default function AnalyticsPage() {
     return null;
   };
 
+  const RadarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-popover border border-border/50 rounded-lg px-3 py-2 text-xs shadow-lg">
+          <p className="font-semibold">{payload[0]?.payload?.day}</p>
+          <p style={{ color: 'hsl(217 91% 60%)' }}>Média: {formatMinutes(payload[0]?.value || 0)}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -115,17 +131,17 @@ export default function AnalyticsPage() {
               </ResponsiveContainer>
             </motion.div>
 
-            {/* By weekday */}
+            {/* By weekday - RADAR */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="metric-card">
               <h3 className="text-sm font-semibold mb-4">Por Dia da Semana (Média)</h3>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={byWeekday}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(228 18% 16%)" />
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'hsl(215 15% 50%)' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(215 15% 50%)' }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="media" fill="hsl(172 66% 50%)" radius={[4, 4, 0, 0]} name="Média" />
-                </BarChart>
+                <RadarChart data={byWeekday} cx="50%" cy="50%" outerRadius="70%">
+                  <PolarGrid stroke="hsl(228 18% 20%)" />
+                  <PolarAngleAxis dataKey="day" tick={{ fontSize: 11, fill: 'hsl(215 15% 60%)' }} />
+                  <PolarRadiusAxis tick={{ fontSize: 9, fill: 'hsl(215 15% 40%)' }} />
+                  <Radar name="Média" dataKey="media" stroke="hsl(217 91% 60%)" fill="hsl(217 91% 60%)" fillOpacity={0.25} strokeWidth={2} />
+                  <Tooltip content={<RadarTooltip />} />
+                </RadarChart>
               </ResponsiveContainer>
             </motion.div>
           </div>
