@@ -47,6 +47,7 @@ export type Database = {
           daily_minutes: number
           id: string
           monthly_minutes: number
+          study_days: Json
           total_days: number
           total_hours: number
           updated_at: string
@@ -58,6 +59,7 @@ export type Database = {
           daily_minutes?: number
           id?: string
           monthly_minutes?: number
+          study_days?: Json
           total_days?: number
           total_hours?: number
           updated_at?: string
@@ -69,6 +71,7 @@ export type Database = {
           daily_minutes?: number
           id?: string
           monthly_minutes?: number
+          study_days?: Json
           total_days?: number
           total_hours?: number
           updated_at?: string

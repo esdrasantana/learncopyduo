@@ -1,0 +1,1 @@
+ALTER TABLE public.goals ADD COLUMN study_days jsonb NOT NULL DEFAULT '[1,2,3,4,5]'::jsonb;
