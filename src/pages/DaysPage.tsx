@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useStudyData } from '@/hooks/useStudyData';
 import { motion } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -24,6 +24,7 @@ export default function DaysPage() {
         difference: studied - goals.dailyMinutes,
         progress: Math.min(100, (studied / goals.dailyMinutes) * 100),
         metGoal: studied >= goals.dailyMinutes,
+        hasStudied: studied > 0,
       };
     });
   }, [sessions, goals.dailyMinutes, getMinutesByDate]);
@@ -47,7 +48,7 @@ export default function DaysPage() {
                 <th className="text-center py-3 px-2">Estudado</th>
                 <th className="text-center py-3 px-2">Diferença</th>
                 <th className="text-center py-3 px-2 hidden sm:table-cell">Progresso</th>
-                <th className="text-center py-3 px-2">Status</th>
+                <th className="text-center py-3 px-2">Streak</th>
               </tr>
             </thead>
             <tbody>
@@ -70,10 +71,10 @@ export default function DaysPage() {
                     </div>
                   </td>
                   <td className="py-3 px-2 text-center">
-                    {day.metGoal ? (
-                      <CheckCircle className="w-4 h-4 text-success inline" />
+                    {day.hasStudied ? (
+                      <Flame className="w-5 h-5 text-warning inline drop-shadow-[0_0_4px_hsl(var(--warning)/0.5)]" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-destructive inline" />
+                      <Flame className="w-5 h-5 text-muted-foreground/30 inline" />
                     )}
                   </td>
                 </motion.tr>

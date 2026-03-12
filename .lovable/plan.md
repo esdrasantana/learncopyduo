@@ -1,100 +1,66 @@
 
 
-# Plan: Streak Fix, Medals Expansion, Dashboard Improvements
+# Plan: Analytics Radar Chart, Smart Goals, Dashboard Sync, Quick Discipline
 
-## 1. Fix Streak Logic (useStudyData.tsx)
+## 1. Radar Chart for Weekday Study (AnalyticsPage.tsx)
 
-**Current:** Streak counts only days where `mins >= goals.dailyMinutes`. 
-**New:** Streak counts any day with at least one session (any study = counts). Skip non-study days (weekends if not in `studyDays`).
+Replace the weekday bar chart (lines 118-131) with a Recharts `RadarChart`:
+- Import `RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar` from recharts
+- Use existing `byWeekday` data (already computes `media` per weekday)
+- Show values in hours format in tooltip (convert minutes to `Xh Ym`)
+- Style with translucent fill and border matching the theme
 
-Change in `useStudyData.tsx` streak `useMemo` (line 186-210):
-- Replace `if (mins >= goals.dailyMinutes)` with `if (dates.includes(dateStr))` — any study counts
-- Keep the skip for non-study days (already implemented)
+## 2. Smart Goals — Auto-calculate Weekly/Monthly (GoalsPage.tsx + useStudyData.ts)
 
-## 2. DaysPage Visual — Flame Instead of X (DaysPage.tsx)
+**GoalsPage.tsx:**
+- Keep only "Meta Diária (horas)" as editable input
+- Remove weekly/monthly inputs — show them as read-only calculated values
+- Add "Dias de Estudo por Semana" selector (checkboxes for each weekday: Seg-Dom)
+- On daily goal change: auto-calculate `weekly = daily × studyDaysPerWeek`, `monthly = weekly × ~4.3`
+- Display all goals in hours format
 
-Replace `CheckCircle`/`XCircle` icons with flame icons:
-- Studied day: 🔥 flame emoji or `Flame` icon (orange/warning color)
-- No study: gray/muted flame or dash
-- Update the status column accordingly
+**Database migration:** Add `study_days` column (jsonb, default `[1,2,3,4,5]`) to `goals` table.
 
-## 3. Stock Price → Performance Evolution Chart (Dashboard.tsx)
+**useStudyData.ts:** 
+- Include `study_days` in Goals type and fetch/save logic
+- When `setGoals` is called with new dailyMinutes, auto-compute weekly/monthly based on study_days count
 
-Replace the `MetricCard` for "Preço das Ações" with an `AreaChart` (Recharts):
-- Use `stockPrice.history` data (already computed with `{ date, value }[]`)
-- Line chart with gradient fill below
-- Green when positive, red when negative
-- Import `AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer` from recharts
+**types/study.ts:** Add `studyDays?: number[]` to Goals interface.
 
-## 4. Fix Session Ordering
+## 3. Dashboard Sync After Goal Changes
 
-**Dashboard.tsx line 120:** `sessions.slice(-5).reverse()` — sessions are fetched `order('created_at', { ascending: false })`, so newest first. `.slice(-5).reverse()` takes the OLDEST 5 and reverses them. Fix: use `sessions.slice(0, 5)`.
+The dashboard already reads from `useStudyData()` which holds goals in React state. The issue is that `setGoals` in `useStudyData` updates `goalsState` immediately, so Dashboard should re-render. 
 
-**Sessions.tsx line 122:** `[...sessions].reverse()` — same issue, this reverses to oldest-first. Fix: just use `sessions` directly (already newest-first from fetch).
+**Root cause investigation:** The `goals` object reference may not change properly, or the Dashboard component may not be re-mounting. Since `useStudyData` is called independently in each page (not via context), each page has its own copy.
 
-## 5. Expand Medals System
+**Fix:** Convert `useStudyData` into a React Context provider so all pages share the same state. When goals are updated in GoalsPage, Dashboard will see the change immediately.
 
-### 5a. Update `defaultMedals` in `src/data/medals.ts`
+- Create `StudyDataProvider` wrapping the app
+- Export `useStudyData` as a context consumer
+- All pages will share the same sessions/goals/disciplines state
 
-Replace current medals with the new set:
+## 4. Quick Discipline Creation in Timer (TimerPage.tsx)
 
-**Tempo Acumulado (accumulated_time):**
-- `time-10`: Iniciante (10h)
-- `time-50`: Aprendiz (50h)  
-- `time-100`: Estudioso (100h)
-- `time-250`: Especialista (250h)
-- `time-500`: Mestre (500h)
-- `time-1000`: Grão-Mestre (1000h)
+- Add a "+ Nova Disciplina" option at the bottom of the discipline `Select` dropdown
+- When clicked, show a small inline dialog/popover to enter name + color
+- Call `addDiscipline` from `useStudyData` and auto-select the new discipline
 
-**Alta Produtividade (performance):**
-- `single-5h`: Bateria Cheia (5h in one day)
+## 5. Goals Display in Hours (already partially done)
 
-**Consistência (consistency):**
-- `streak-7`: Guerreiro da Semana (7 days)
-- `streak-14`: Lutador Quinzenal (14 days)
-- `streak-30`: Mestre Mensal (30 days)
-- `streak-42`: Maratonista (42 days)
-- `streak-100`: Centurião (100 days)
-- `discipline-30`: Super-Homem (same discipline 30 consecutive days)
+Ensure all metric cards in Dashboard and GoalsPage show hours format (`Xh Ym`) instead of raw minutes. Review `formatMinutes` usage — it already does this, so verify the GoalsPage inputs use hours correctly.
 
-**Hábito de Estudo (new category "habit"):**
-- `early-bird`: Pessoa Matinal (sessions 03:00-06:30, target: 10 sessions)
-- `night-owl`: Coruja Noturna (sessions 20:00-23:00, target: 7 sessions)
-
-### 5b. Add "habit" to MedalCategory type (types/study.ts)
-
-### 5c. Update `checkMedals` in useStudyData.tsx
-
-Add cases for new medal IDs:
-- `time-250`: same as other time medals
-- `single-5h`: max daily hours
-- `streak-14/30/42/100`: use current streak value
-- `discipline-30`: compute max consecutive days for any single discipline
-- `early-bird`: count sessions with startTime between "03:00" and "06:30"
-- `night-owl`: count sessions with startTime between "20:00" and "23:00"
-
-### 5d. DB Migration
-
-Insert new medal rows for existing users via migration. Use `INSERT ... ON CONFLICT DO NOTHING` pattern for the new medal_ids in the `handle_new_user` trigger update.
-
-### 5e. Update MedalsPage category labels
-
-Add `habit: 'Hábito de Estudo'` to `categoryLabels`.
-
-## 6. Trophy Counter (MedalsPage.tsx)
-
-Already shows `{unlocked}/{total}` in the header (line 25-26). The format is correct. Just ensure it says "Troféus conquistados:" more prominently.
+---
 
 ## Files Changed
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useStudyData.tsx` | Streak logic (any study counts), new medal checks |
-| `src/pages/Dashboard.tsx` | AreaChart for stock price, fix session order |
-| `src/pages/Sessions.tsx` | Fix session order |
-| `src/pages/DaysPage.tsx` | Flame icons instead of check/X |
-| `src/pages/MedalsPage.tsx` | Add "habit" category label, improve counter |
-| `src/data/medals.ts` | Expanded medal definitions |
-| `src/types/study.ts` | Add 'habit' to MedalCategory |
-| DB migration | Add new medal rows for existing users, update trigger |
+| File | Change |
+|------|--------|
+| `src/types/study.ts` | Add `studyDays` to Goals |
+| Migration SQL | Add `study_days jsonb` to goals table |
+| `src/hooks/useStudyData.ts` | Convert to Context provider, add study_days support, auto-calc weekly/monthly |
+| `src/App.tsx` | Wrap with `StudyDataProvider` |
+| `src/pages/AnalyticsPage.tsx` | Replace weekday bar chart with RadarChart |
+| `src/pages/GoalsPage.tsx` | Smart goals UI (daily only editable + weekday checkboxes) |
+| `src/pages/TimerPage.tsx` | Add quick discipline creation |
+| `src/pages/Dashboard.tsx` | Minor — will auto-sync via shared context |
 

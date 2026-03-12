@@ -119,7 +119,7 @@ export default function Sessions() {
           <p className="text-muted-foreground text-sm">Nenhuma sessão registrada.</p>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {[...sessions].reverse().map(s => (
+            {sessions.map(s => (
               <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-2 h-2 rounded-full bg-primary shrink-0" />

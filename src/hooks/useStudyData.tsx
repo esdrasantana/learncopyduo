@@ -192,22 +192,23 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < 365; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
-      const dayOfWeek = checkDate.getDay(); // 0=Sun, 1=Mon...
+      const dayOfWeek = checkDate.getDay();
       const dateStr = checkDate.toISOString().split('T')[0];
       
-      // Skip non-study days
+      // Skip non-study days (weekends etc.) — they don't break streak
       if (!activeStudyDays.includes(dayOfWeek)) continue;
       
+      // Any study counts for streak (no need to meet daily goal)
       if (dates.includes(dateStr)) {
-        const mins = getMinutesByDate(dateStr);
-        if (mins >= goals.dailyMinutes) count++;
-        else if (count > 0) break;
-        else break;
-      } else if (count > 0) break;
-      else break;
+        count++;
+      } else if (count > 0) {
+        break;
+      } else {
+        break;
+      }
     }
     return count;
-  }, [sessions, goals.dailyMinutes, goals.studyDays, getMinutesByDate]);
+  }, [sessions, goals.studyDays]);
 
   const stockPrice = useMemo(() => {
     const dates = [...new Set(sessions.map(s => s.date))].sort();
@@ -224,19 +225,50 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
 
   const checkMedals = useCallback(async () => {
     if (!user) return;
+
+    // Precompute helpers
+    const allDates = [...new Set(sessions.map(s => s.date))];
+    const maxDailyHours = Math.max(0, ...allDates.map(d => getMinutesByDate(d))) / 60;
+    const totalHours = totalMinutes / 60;
+
+    // Early bird / night owl counts
+    const earlyBirdCount = sessions.filter(s => s.startTime >= '03:00' && s.startTime <= '06:30').length;
+    const nightOwlCount = sessions.filter(s => s.startTime >= '20:00' && s.startTime <= '23:00').length;
+
+    // Max consecutive days for a single discipline
+    let maxDisciplineStreak = 0;
+    const disciplineNames = [...new Set(sessions.map(s => s.discipline))];
+    for (const disc of disciplineNames) {
+      const discDates = [...new Set(sessions.filter(s => s.discipline === disc).map(s => s.date))].sort();
+      let cs = 1;
+      for (let i = 1; i < discDates.length; i++) {
+        const prev = new Date(discDates[i - 1]);
+        const curr = new Date(discDates[i]);
+        const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+        if (diff === 1) { cs++; } else { cs = 1; }
+        maxDisciplineStreak = Math.max(maxDisciplineStreak, cs);
+      }
+      maxDisciplineStreak = Math.max(maxDisciplineStreak, cs);
+    }
+
     const updated = medals.map(medal => {
       if (medal.unlocked) return medal;
       let currentValue = 0;
       switch (medal.id) {
         case 'time-10': case 'time-50': case 'time-100':
-        case 'time-300': case 'time-500': case 'time-1000':
-          currentValue = totalMinutes / 60; break;
-        case 'streak-7': currentValue = streak; break;
-        case 'single-6h': case 'single-10h': {
-          const allDates = [...new Set(sessions.map(s => s.date))];
-          currentValue = Math.max(0, ...allDates.map(d => getMinutesByDate(d))) / 60;
-          break;
-        }
+        case 'time-250': case 'time-500': case 'time-1000':
+          currentValue = totalHours; break;
+        case 'single-5h':
+          currentValue = maxDailyHours; break;
+        case 'streak-7': case 'streak-14': case 'streak-30':
+        case 'streak-42': case 'streak-100':
+          currentValue = streak; break;
+        case 'discipline-30':
+          currentValue = maxDisciplineStreak; break;
+        case 'early-bird':
+          currentValue = earlyBirdCount; break;
+        case 'night-owl':
+          currentValue = nightOwlCount; break;
         default: currentValue = medal.currentValue;
       }
       const unlocked = currentValue >= medal.targetValue;

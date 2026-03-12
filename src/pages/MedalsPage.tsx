@@ -6,15 +6,17 @@ import { cn } from '@/lib/utils';
 import { MedalCategory } from '@/types/study';
 
 const categoryLabels: Record<MedalCategory, string> = {
-  performance: 'Performance',
+  performance: 'Alta Produtividade',
   accumulated_time: 'Tempo Acumulado',
   consistency: 'Consistência',
   discipline: 'Disciplina',
+  habit: 'Hábito de Estudo',
 };
 
 export default function MedalsPage() {
   const { medals, checkMedals } = useStudyData();
 
+  const unlockedCount = medals.filter(m => m.unlocked).length;
   const categories = Object.keys(categoryLabels) as MedalCategory[];
 
   return (
@@ -23,13 +25,22 @@ export default function MedalsPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Medalhas</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {medals.filter(m => m.unlocked).length}/{medals.length} desbloqueadas
+            Troféus conquistados: <span className="font-semibold text-foreground">{unlockedCount}</span> / <span className="font-semibold text-foreground">{medals.length}</span>
           </p>
         </div>
         <div className="flex items-center gap-2 bg-warning/10 text-warning px-3 py-1.5 rounded-full">
           <Trophy className="w-4 h-4" />
-          <span className="font-mono text-sm font-semibold">{medals.filter(m => m.unlocked).length}</span>
+          <span className="font-mono text-sm font-semibold">{unlockedCount}</span>
         </div>
+      </div>
+
+      {/* Progress bar for overall trophy completion */}
+      <div className="metric-card">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="text-muted-foreground">Progresso Geral</span>
+          <span className="font-mono font-semibold">{medals.length > 0 ? Math.round((unlockedCount / medals.length) * 100) : 0}%</span>
+        </div>
+        <Progress value={medals.length > 0 ? (unlockedCount / medals.length) * 100 : 0} className="h-2 bg-secondary" />
       </div>
 
       {categories.map(cat => {

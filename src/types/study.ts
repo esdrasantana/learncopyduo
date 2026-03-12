@@ -39,7 +39,7 @@ export interface Medal {
   icon: string;
 }
 
-export type MedalCategory = 'performance' | 'accumulated_time' | 'consistency' | 'discipline';
+export type MedalCategory = 'performance' | 'accumulated_time' | 'consistency' | 'discipline' | 'habit';
 
 export interface DayRecord {
   date: string;
