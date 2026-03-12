@@ -1,8 +1,9 @@
 import { useStudyData } from '@/hooks/useStudyData';
 import MetricCard from '@/components/MetricCard';
-import { Calendar, Clock, Target, Zap, TrendingUp, TrendingDown, Flame, BarChart3 } from 'lucide-react';
+import { Calendar, Clock, Target, TrendingUp, Flame, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -87,25 +88,58 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Stock price & streak */}
+      {/* Performance Evolution Chart + Streak */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-        <MetricCard
-          title="Preço das Ações"
-          value={stockPrice.accumulated === 0 ? '0min' : `-${formatMinutes(Math.abs(stockPrice.accumulated))}`}
-          icon={stockPrice.accumulated < 0 ? TrendingDown : BarChart3}
-          variant={stockPrice.accumulated < 0 ? 'danger' : 'success'}
-          subtitle={stockPrice.compensationNeeded > 0 ? `Compensar: ${formatMinutes(stockPrice.compensationNeeded)}` : 'Nenhum déficit!'}
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="metric-card"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Evolução de Desempenho</p>
+              <p className="text-lg font-mono font-bold mt-1">
+                {stockPrice.accumulated >= 0 ? '+' : ''}{formatMinutes(Math.abs(stockPrice.accumulated))}
+              </p>
+            </div>
+            <BarChart3 className="w-5 h-5 text-muted-foreground" />
+          </div>
+          {stockPrice.history.length > 1 ? (
+            <ResponsiveContainer width="100%" height={120}>
+              <AreaChart data={stockPrice.history}>
+                <defs>
+                  <linearGradient id="perfGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border)/0.3)" />
+                <XAxis dataKey="date" hide />
+                <YAxis hide />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                  formatter={(value: number) => [formatMinutes(Math.abs(value)), 'Saldo']}
+                  labelFormatter={(label) => label}
+                />
+                <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#perfGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-xs text-muted-foreground">Dados insuficientes para o gráfico</p>
+          )}
+        </motion.div>
+
         <MetricCard
           title="Streak"
           value={`${streak} dias`}
           icon={Flame}
           variant={streak >= 7 ? 'success' : streak > 0 ? 'accent' : 'default'}
-          subtitle="dias consecutivos com meta"
+          subtitle="dias consecutivos de estudo"
         />
       </div>
 
-      {/* Recent sessions */}
+      {/* Recent sessions — newest first */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -117,7 +151,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-sm">Nenhuma sessão registrada. Comece agora!</p>
         ) : (
           <div className="space-y-2">
-            {sessions.slice(-5).reverse().map(s => (
+            {sessions.slice(0, 5).map(s => (
               <div key={s.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-primary" />
