@@ -192,22 +192,23 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < 365; i++) {
       const checkDate = new Date(today);
       checkDate.setDate(checkDate.getDate() - i);
-      const dayOfWeek = checkDate.getDay(); // 0=Sun, 1=Mon...
+      const dayOfWeek = checkDate.getDay();
       const dateStr = checkDate.toISOString().split('T')[0];
       
-      // Skip non-study days
+      // Skip non-study days (weekends etc.) — they don't break streak
       if (!activeStudyDays.includes(dayOfWeek)) continue;
       
+      // Any study counts for streak (no need to meet daily goal)
       if (dates.includes(dateStr)) {
-        const mins = getMinutesByDate(dateStr);
-        if (mins >= goals.dailyMinutes) count++;
-        else if (count > 0) break;
-        else break;
-      } else if (count > 0) break;
-      else break;
+        count++;
+      } else if (count > 0) {
+        break;
+      } else {
+        break;
+      }
     }
     return count;
-  }, [sessions, goals.dailyMinutes, goals.studyDays, getMinutesByDate]);
+  }, [sessions, goals.studyDays]);
 
   const stockPrice = useMemo(() => {
     const dates = [...new Set(sessions.map(s => s.date))].sort();
