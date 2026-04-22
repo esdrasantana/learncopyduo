@@ -67,6 +67,27 @@ export default function TimerPage() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
+  // Update browser tab title with elapsed time while timer is running
+  useEffect(() => {
+    const defaultTitle = 'Studio OS';
+    if (!isRunning) {
+      document.title = defaultTitle;
+      return;
+    }
+    const formatTitle = (s: number) => {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return h > 0
+        ? `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+        : `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+    };
+    document.title = `${formatTitle(displaySeconds)} - ${defaultTitle}${isPaused ? ' (Pausado)' : ''}`;
+    return () => {
+      document.title = defaultTitle;
+    };
+  }, [isRunning, isPaused, displaySeconds]);
+
   const handleStart = () => {
     if (!discipline) { toast.error('Selecione uma disciplina'); return; }
     const now = Date.now();
