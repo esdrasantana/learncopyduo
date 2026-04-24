@@ -296,6 +296,42 @@ export default function GoalsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reset All confirmation dialog */}
+      <Dialog open={showResetDialog} onOpenChange={(open) => { setShowResetDialog(open); if (!open) setResetConfirmText(''); }}>
+        <DialogContent className="sm:max-w-md bg-card border-destructive/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" /> Resetar Todos os Dados
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-2">
+              Esta ação é <strong>permanente e irreversível</strong>. Serão apagados:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+            <li>Todas as sessões de estudo</li>
+            <li>Todos os projetos (ciclos)</li>
+            <li>Progresso de medalhas</li>
+            <li>Configurações de metas</li>
+          </ul>
+          <div className="space-y-1.5 pt-2">
+            <Label className="text-xs">Digite <strong className="text-destructive font-mono">RESETAR</strong> para confirmar</Label>
+            <Input
+              value={resetConfirmText}
+              onChange={e => setResetConfirmText(e.target.value)}
+              placeholder="RESETAR"
+              className="bg-secondary border-destructive/40 font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetDialog(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleResetAll} disabled={resetConfirmText !== 'RESETAR'}>
+              Resetar Tudo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
