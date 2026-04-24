@@ -244,7 +244,36 @@ export default function GoalsPage() {
         </div>
       </motion.div>
 
-      {/* Add discipline dialog */}
+      {/* Timer settings */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="metric-card">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="w-4 h-4 text-warning" /> Auto-iniciar Cronômetro
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Inicia o timer automaticamente ao detectar interação na página do cronômetro (clique ou tecla).
+            </p>
+          </div>
+          <Switch checked={goals.autoStartTimer} onCheckedChange={handleAutoStartToggle} />
+        </div>
+      </motion.div>
+
+      {/* Danger Zone */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="metric-card border-destructive/30">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-4 h-4" /> Zona de Perigo
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Apaga permanentemente todas as sessões, projetos, medalhas desbloqueadas e restaura as metas. Sua conta permanece ativa.
+          </p>
+          <Button variant="destructive" size="sm" onClick={() => setShowResetDialog(true)} className="gap-2">
+            <Trash2 className="w-3.5 h-3.5" /> Resetar Tudo
+          </Button>
+        </div>
+      </motion.div>
+
       <Dialog open={showAddDisc} onOpenChange={setShowAddDisc}>
         <DialogContent className="sm:max-w-sm bg-card border-border/50">
           <DialogHeader><DialogTitle>Nova Disciplina</DialogTitle></DialogHeader>
