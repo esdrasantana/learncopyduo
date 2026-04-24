@@ -24,6 +24,25 @@ export interface Goals {
   totalDays: number;
   totalHours: number;
   studyDays: number[];
+  autoStartTimer: boolean;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PersistedTimer {
+  projectId: string | null;
+  discipline: string;
+  startTimestamp: number;
+  accumulatedPause: number;
+  pauseStart: number;
+  isPaused: boolean;
+  startTimeStr: string;
+  savedAt: number;
 }
 
 export interface Medal {
