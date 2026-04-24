@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import MetricCard from '@/components/MetricCard';
-import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check, AlertTriangle, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -27,7 +29,7 @@ const WEEKDAY_LABELS = [
 ];
 
 export default function GoalsPage() {
-  const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline } = useStudyData();
+  const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline, resetAllData } = useStudyData();
 
   const [newDiscName, setNewDiscName] = useState('');
   const [newDiscColor, setNewDiscColor] = useState('#3b82f6');
@@ -35,6 +37,9 @@ export default function GoalsPage() {
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
   const [showAddDisc, setShowAddDisc] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+
 
   const dailyHours = goals.dailyMinutes / 60;
   const studyDaysPerWeek = goals.studyDays.length;
@@ -90,6 +95,21 @@ export default function GoalsPage() {
     if (!editingId || !editName.trim()) return;
     updateDiscipline(editingId, editName.trim(), editColor);
     setEditingId(null);
+  };
+
+  const handleAutoStartToggle = (checked: boolean) => {
+    setGoals({ ...goals, autoStartTimer: checked });
+    toast.success(checked ? 'Auto-iniciar ativado' : 'Auto-iniciar desativado');
+  };
+
+  const handleResetAll = async () => {
+    if (resetConfirmText !== 'RESETAR') {
+      toast.error('Digite RESETAR para confirmar');
+      return;
+    }
+    await resetAllData();
+    setResetConfirmText('');
+    setShowResetDialog(false);
   };
 
   return (
@@ -224,7 +244,36 @@ export default function GoalsPage() {
         </div>
       </motion.div>
 
-      {/* Add discipline dialog */}
+      {/* Timer settings */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="metric-card">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="w-4 h-4 text-warning" /> Auto-iniciar Cronômetro
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Inicia o timer automaticamente ao detectar interação na página do cronômetro (clique ou tecla).
+            </p>
+          </div>
+          <Switch checked={goals.autoStartTimer} onCheckedChange={handleAutoStartToggle} />
+        </div>
+      </motion.div>
+
+      {/* Danger Zone */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="metric-card border-destructive/30">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-4 h-4" /> Zona de Perigo
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Apaga permanentemente todas as sessões, projetos, medalhas desbloqueadas e restaura as metas. Sua conta permanece ativa.
+          </p>
+          <Button variant="destructive" size="sm" onClick={() => setShowResetDialog(true)} className="gap-2">
+            <Trash2 className="w-3.5 h-3.5" /> Resetar Tudo
+          </Button>
+        </div>
+      </motion.div>
+
       <Dialog open={showAddDisc} onOpenChange={setShowAddDisc}>
         <DialogContent className="sm:max-w-sm bg-card border-border/50">
           <DialogHeader><DialogTitle>Nova Disciplina</DialogTitle></DialogHeader>
@@ -247,6 +296,42 @@ export default function GoalsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reset All confirmation dialog */}
+      <Dialog open={showResetDialog} onOpenChange={(open) => { setShowResetDialog(open); if (!open) setResetConfirmText(''); }}>
+        <DialogContent className="sm:max-w-md bg-card border-destructive/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" /> Resetar Todos os Dados
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-2">
+              Esta ação é <strong>permanente e irreversível</strong>. Serão apagados:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+            <li>Todas as sessões de estudo</li>
+            <li>Todos os projetos (ciclos)</li>
+            <li>Progresso de medalhas</li>
+            <li>Configurações de metas</li>
+          </ul>
+          <div className="space-y-1.5 pt-2">
+            <Label className="text-xs">Digite <strong className="text-destructive font-mono">RESETAR</strong> para confirmar</Label>
+            <Input
+              value={resetConfirmText}
+              onChange={e => setResetConfirmText(e.target.value)}
+              placeholder="RESETAR"
+              className="bg-secondary border-destructive/40 font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetDialog(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleResetAll} disabled={resetConfirmText !== 'RESETAR'}>
+              Resetar Tudo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

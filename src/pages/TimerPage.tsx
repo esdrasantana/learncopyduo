@@ -8,10 +8,14 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Play, Pause, Save, RotateCcw, Plus } from 'lucide-react';
 import SessionSummaryDialog from '@/components/SessionSummaryDialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import type { PersistedTimer } from '@/types/study';
+
+const STORAGE_KEY = 'studyos_timer_state';
+const AUTOSAVE_MS = 15000;
 
 export default function TimerPage() {
-  const { addSession, disciplines, checkMedals, addDiscipline } = useStudyData();
+  const { addSession, disciplines, checkMedals, addDiscipline, activeProject, goals } = useStudyData();
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [discipline, setDiscipline] = useState('');
@@ -27,8 +31,84 @@ export default function TimerPage() {
   const [pauseDisplaySeconds, setPauseDisplaySeconds] = useState(0);
   const [startTimeStr, setStartTimeStr] = useState('');
 
-  const intervalRef = useRef<number | null>(null);
+  // Recovery dialog
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryData, setRecoveryData] = useState<PersistedTimer | null>(null);
+  const recoveryCheckedRef = useRef(false);
 
+  const intervalRef = useRef<number | null>(null);
+  const autoSaveRef = useRef<number | null>(null);
+
+  // ---------- Persistence helpers ----------
+  const persist = useCallback((override?: Partial<PersistedTimer>) => {
+    try {
+      const data: PersistedTimer = {
+        projectId: activeProject?.id ?? null,
+        discipline,
+        startTimestamp,
+        accumulatedPause,
+        pauseStart,
+        isPaused,
+        startTimeStr,
+        savedAt: Date.now(),
+        ...override,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {/* ignore */}
+  }, [activeProject, discipline, startTimestamp, accumulatedPause, pauseStart, isPaused, startTimeStr]);
+
+  const clearPersisted = useCallback(() => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {/* ignore */}
+  }, []);
+
+  // ---------- Recovery on mount ----------
+  useEffect(() => {
+    if (recoveryCheckedRef.current) return;
+    recoveryCheckedRef.current = true;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as PersistedTimer;
+      if (!data?.startTimestamp) return;
+      // Only offer recovery if same project (or no project mismatch)
+      if (activeProject && data.projectId && data.projectId !== activeProject.id) {
+        clearPersisted();
+        return;
+      }
+      setRecoveryData(data);
+      setShowRecovery(true);
+    } catch {
+      clearPersisted();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject?.id]);
+
+  const handleResumeRecovery = () => {
+    if (!recoveryData) return;
+    setDiscipline(recoveryData.discipline);
+    setStartTimestamp(recoveryData.startTimestamp);
+    setAccumulatedPause(recoveryData.accumulatedPause);
+    setStartTimeStr(recoveryData.startTimeStr);
+    if (recoveryData.isPaused && recoveryData.pauseStart) {
+      setPauseStart(recoveryData.pauseStart);
+      setIsPaused(true);
+    } else {
+      setPauseStart(0);
+      setIsPaused(false);
+    }
+    setIsRunning(true);
+    setShowRecovery(false);
+    setRecoveryData(null);
+    toast.success('Sessão recuperada!');
+  };
+
+  const handleDiscardRecovery = () => {
+    clearPersisted();
+    setShowRecovery(false);
+    setRecoveryData(null);
+  };
+
+  // ---------- Tick / display update ----------
   const recalculate = useCallback(() => {
     if (!isRunning) return;
     const now = Date.now();
@@ -60,6 +140,27 @@ export default function TimerPage() {
     return () => document.removeEventListener('visibilitychange', handler);
   }, [isRunning, recalculate]);
 
+  // ---------- Auto-save while running ----------
+  useEffect(() => {
+    if (!isRunning) return;
+    persist();
+    autoSaveRef.current = window.setInterval(() => persist(), AUTOSAVE_MS);
+    return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
+  }, [isRunning, persist]);
+
+  // Save on beforeunload
+  useEffect(() => {
+    const handler = () => { if (isRunning) persist(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isRunning, persist]);
+
+  // Save when project changes while running
+  useEffect(() => {
+    if (isRunning) persist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject?.id]);
+
   const formatTime = (s: number) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -67,7 +168,7 @@ export default function TimerPage() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Update browser tab title with elapsed time while timer is running
+  // Tab title
   useEffect(() => {
     const defaultTitle = 'Studio OS';
     if (!isRunning) {
@@ -83,12 +184,10 @@ export default function TimerPage() {
         : `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     };
     document.title = `${formatTitle(displaySeconds)} - ${defaultTitle}${isPaused ? ' (Pausado)' : ''}`;
-    return () => {
-      document.title = defaultTitle;
-    };
+    return () => { document.title = defaultTitle; };
   }, [isRunning, isPaused, displaySeconds]);
 
-  const handleStart = () => {
+  const handleStart = useCallback(() => {
     if (!discipline) { toast.error('Selecione uma disciplina'); return; }
     const now = Date.now();
     setStartTimestamp(now);
@@ -100,7 +199,19 @@ export default function TimerPage() {
     setIsPaused(false);
     const d = new Date(now);
     setStartTimeStr(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
-  };
+  }, [discipline]);
+
+  // ---------- Auto-start on first interaction ----------
+  useEffect(() => {
+    if (!goals.autoStartTimer || isRunning || showRecovery || !discipline) return;
+    const trigger = () => { if (!isRunning && discipline) handleStart(); };
+    window.addEventListener('keydown', trigger, { once: true });
+    window.addEventListener('mousedown', trigger, { once: true });
+    return () => {
+      window.removeEventListener('keydown', trigger);
+      window.removeEventListener('mousedown', trigger);
+    };
+  }, [goals.autoStartTimer, isRunning, showRecovery, discipline, handleStart]);
 
   const handlePause = () => {
     if (isPaused) {
@@ -112,6 +223,8 @@ export default function TimerPage() {
       setPauseStart(Date.now());
       setIsPaused(true);
     }
+    // Persist immediately on pause toggle
+    setTimeout(() => persist(), 0);
   };
 
   const handleSave = () => {
@@ -141,6 +254,7 @@ export default function TimerPage() {
     setDisplaySeconds(0);
     setPauseDisplaySeconds(0);
     setStartTimeStr('');
+    clearPersisted();
   };
 
   const handleCreateDiscipline = async () => {
@@ -155,10 +269,25 @@ export default function TimerPage() {
   const now = new Date();
   const endTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
+  // Format recovery elapsed
+  const recoveryElapsed = (() => {
+    if (!recoveryData) return '00:00';
+    const now = Date.now();
+    const pauseExtra = recoveryData.isPaused && recoveryData.pauseStart ? (now - recoveryData.pauseStart) : 0;
+    const elapsedMs = now - recoveryData.startTimestamp - recoveryData.accumulatedPause - pauseExtra;
+    const s = Math.max(0, Math.floor(elapsedMs / 1000));
+    return formatTime(s);
+  })();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-8">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-6">
         <h1 className="text-xl font-bold text-muted-foreground uppercase tracking-widest">Modo Foco</h1>
+        {activeProject && (
+          <p className="text-xs text-muted-foreground -mt-4">
+            Projeto: <span className="text-primary font-medium">{activeProject.name}</span>
+          </p>
+        )}
 
         <div className={`relative ${isRunning && !isPaused ? 'glow-primary' : ''} rounded-full p-1`}>
           <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-2 border-border/50 bg-card flex items-center justify-center">
@@ -194,6 +323,9 @@ export default function TimerPage() {
               </SelectItem>
             </SelectContent>
           </Select>
+          {goals.autoStartTimer && !isRunning && discipline && (
+            <p className="text-[10px] text-muted-foreground">⚡ Auto-start ativo — clique ou tecle para iniciar</p>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-3">
@@ -234,6 +366,30 @@ export default function TimerPage() {
         disciplines={disciplines}
         onConfirm={handleConfirmSave}
       />
+
+      {/* Recovery dialog */}
+      <Dialog open={showRecovery} onOpenChange={(o) => !o && handleDiscardRecovery()}>
+        <DialogContent className="sm:max-w-md bg-card border-primary/30">
+          <DialogHeader>
+            <DialogTitle>Sessão ativa encontrada</DialogTitle>
+            <DialogDescription className="text-xs pt-1">
+              Detectamos um cronômetro que estava ativo na sua última visita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm">
+              Disciplina: <span className="font-medium text-primary">{recoveryData?.discipline || '—'}</span>
+            </p>
+            <p className="text-sm">
+              Tempo decorrido: <span className="font-mono font-bold text-foreground">{recoveryElapsed}</span>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDiscardRecovery}>Descartar</Button>
+            <Button onClick={handleResumeRecovery} className="bg-primary">Continuar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick discipline creation dialog */}
       <Dialog open={showNewDisc} onOpenChange={setShowNewDisc}>
