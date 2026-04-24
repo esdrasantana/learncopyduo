@@ -97,6 +97,21 @@ export default function GoalsPage() {
     setEditingId(null);
   };
 
+  const handleAutoStartToggle = (checked: boolean) => {
+    setGoals({ ...goals, autoStartTimer: checked });
+    toast.success(checked ? 'Auto-iniciar ativado' : 'Auto-iniciar desativado');
+  };
+
+  const handleResetAll = async () => {
+    if (resetConfirmText !== 'RESETAR') {
+      toast.error('Digite RESETAR para confirmar');
+      return;
+    }
+    await resetAllData();
+    setResetConfirmText('');
+    setShowResetDialog(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
