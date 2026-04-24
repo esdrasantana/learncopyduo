@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import MetricCard from '@/components/MetricCard';
-import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Target, Clock, Calendar, TrendingUp, Plus, Pencil, Trash2, X, Check, AlertTriangle, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+
 
 function formatMinutes(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -27,7 +29,7 @@ const WEEKDAY_LABELS = [
 ];
 
 export default function GoalsPage() {
-  const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline } = useStudyData();
+  const { goals, setGoals, totalMinutes, studyDays, disciplines, addDiscipline, updateDiscipline, deleteDiscipline, resetAllData } = useStudyData();
 
   const [newDiscName, setNewDiscName] = useState('');
   const [newDiscColor, setNewDiscColor] = useState('#3b82f6');
@@ -35,6 +37,9 @@ export default function GoalsPage() {
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
   const [showAddDisc, setShowAddDisc] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+
 
   const dailyHours = goals.dailyMinutes / 60;
   const studyDaysPerWeek = goals.studyDays.length;
