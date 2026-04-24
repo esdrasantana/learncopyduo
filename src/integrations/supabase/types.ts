@@ -43,6 +43,7 @@ export type Database = {
       }
       goals: {
         Row: {
+          auto_start_timer: boolean
           created_at: string
           daily_minutes: number
           id: string
@@ -55,6 +56,7 @@ export type Database = {
           weekly_minutes: number
         }
         Insert: {
+          auto_start_timer?: boolean
           created_at?: string
           daily_minutes?: number
           id?: string
@@ -67,6 +69,7 @@ export type Database = {
           weekly_minutes?: number
         }
         Update: {
+          auto_start_timer?: boolean
           created_at?: string
           daily_minutes?: number
           id?: string
@@ -113,6 +116,33 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           activity: string
@@ -124,6 +154,7 @@ export type Database = {
           id: string
           note: string
           pause_minutes: number
+          project_id: string | null
           start_time: string
           user_id: string
         }
@@ -137,6 +168,7 @@ export type Database = {
           id?: string
           note?: string
           pause_minutes?: number
+          project_id?: string | null
           start_time: string
           user_id: string
         }
@@ -150,6 +182,7 @@ export type Database = {
           id?: string
           note?: string
           pause_minutes?: number
+          project_id?: string | null
           start_time?: string
           user_id?: string
         }
