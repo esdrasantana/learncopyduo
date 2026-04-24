@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Clock, Calendar, Trophy, Target, BarChart3, Timer, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import ProjectSwitcher from './ProjectSwitcher';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -76,6 +77,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        {/* Top bar with project switcher */}
+        <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/30 px-4 md:px-6 lg:px-8 py-3 flex items-center justify-end">
+          <ProjectSwitcher />
+        </div>
         <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
           {children}
         </div>
@@ -83,3 +88,4 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
