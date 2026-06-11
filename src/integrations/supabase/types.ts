@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      answer_history: {
+        Row: {
+          answered_at: string
+          id: string
+          is_correct: boolean
+          project_id: string
+          question_id: string
+          rating: number | null
+          selected: string
+          time_ms: number
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          is_correct: boolean
+          project_id: string
+          question_id: string
+          rating?: number | null
+          selected: string
+          time_ms?: number
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean
+          project_id?: string
+          question_id?: string
+          rating?: number | null
+          selected?: string
+          time_ms?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_history_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disciplines: {
         Row: {
           color: string
@@ -143,6 +194,191 @@ export type Database = {
         }
         Relationships: []
       }
+      questions: {
+        Row: {
+          alt_a: string
+          alt_b: string
+          alt_c: string
+          alt_d: string
+          alt_e: string
+          correct: string
+          created_at: string
+          difficulty: string
+          explanation: string
+          id: string
+          project_id: string
+          source_id: string | null
+          statement: string
+          subject_id: string | null
+          subject_name: string | null
+          topic_id: string | null
+          topic_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alt_a: string
+          alt_b: string
+          alt_c: string
+          alt_d: string
+          alt_e: string
+          correct: string
+          created_at?: string
+          difficulty?: string
+          explanation?: string
+          id?: string
+          project_id: string
+          source_id?: string | null
+          statement: string
+          subject_id?: string | null
+          subject_name?: string | null
+          topic_id?: string | null
+          topic_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alt_a?: string
+          alt_b?: string
+          alt_c?: string
+          alt_d?: string
+          alt_e?: string
+          correct?: string
+          created_at?: string
+          difficulty?: string
+          explanation?: string
+          id?: string
+          project_id?: string
+          source_id?: string | null
+          statement?: string
+          subject_id?: string | null
+          subject_name?: string | null
+          topic_id?: string | null
+          topic_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_schedule: {
+        Row: {
+          created_at: string
+          due_date: string
+          interval_days: number
+          last_rating: number | null
+          last_reviewed_at: string | null
+          project_id: string
+          question_id: string
+          repetitions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_date?: string
+          interval_days?: number
+          last_rating?: number | null
+          last_reviewed_at?: string | null
+          project_id: string
+          question_id: string
+          repetitions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_date?: string
+          interval_days?: number
+          last_rating?: number | null
+          last_reviewed_at?: string | null
+          project_id?: string
+          question_id?: string
+          repetitions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_schedule_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_schedule_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: true
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_settings: {
+        Row: {
+          created_at: string
+          daily_new_limit: number
+          interval_easy: number
+          interval_forgot: number
+          interval_hard: number
+          interval_medium: number
+          interval_very_easy: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_new_limit?: number
+          interval_easy?: number
+          interval_forgot?: number
+          interval_hard?: number
+          interval_medium?: number
+          interval_very_easy?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_new_limit?: number
+          interval_easy?: number
+          interval_forgot?: number
+          interval_hard?: number
+          interval_medium?: number
+          interval_very_easy?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           activity: string
@@ -187,6 +423,130 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sources: {
+        Row: {
+          content_preview: string | null
+          created_at: string
+          id: string
+          project_id: string
+          title: string
+          type: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          content_preview?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          title: string
+          type: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          content_preview?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          title?: string
+          type?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subjects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      topics: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          subject_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          subject_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          subject_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "topics_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
