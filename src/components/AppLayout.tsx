@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Clock, Calendar, Trophy, Target, BarChart3, Timer, LogOut } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, Trophy, Target, BarChart3, Timer, LogOut, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/sessions', icon: Clock, label: 'Sessões' },
   { to: '/timer', icon: Timer, label: 'Timer' },
+  { to: '/questions', icon: Brain, label: 'Questões' },
   { to: '/days', icon: Calendar, label: 'Dias' },
   { to: '/medals', icon: Trophy, label: 'Medalhas' },
   { to: '/goals', icon: Target, label: 'Metas' },

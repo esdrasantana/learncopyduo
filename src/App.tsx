@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { StudyDataProvider } from "@/hooks/useStudyData";
+import { QuestionsProvider } from "@/hooks/useQuestions";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Sessions from "@/pages/Sessions";
@@ -13,6 +14,7 @@ import DaysPage from "@/pages/DaysPage";
 import MedalsPage from "@/pages/MedalsPage";
 import GoalsPage from "@/pages/GoalsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import QuestionsPage from "@/pages/QuestionsPage";
 import AuthPage from "@/pages/AuthPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -36,18 +38,21 @@ function ProtectedRoutes() {
   if (!user) return <Navigate to="/auth" replace />;
 
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/sessions" element={<Sessions />} />
-        <Route path="/timer" element={<TimerPage />} />
-        <Route path="/days" element={<DaysPage />} />
-        <Route path="/medals" element={<MedalsPage />} />
-        <Route path="/goals" element={<GoalsPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+    <QuestionsProvider>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/sessions" element={<Sessions />} />
+          <Route path="/timer" element={<TimerPage />} />
+          <Route path="/questions" element={<QuestionsPage />} />
+          <Route path="/days" element={<DaysPage />} />
+          <Route path="/medals" element={<MedalsPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AppLayout>
+    </QuestionsProvider>
   );
 }
 
